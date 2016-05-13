@@ -60,3 +60,9 @@ p, ul {
 ul {
   padding-left: 30px;
 }
+
+.commentList{
+  max-height: 300px;
+  overflow-y: scroll;
+  margin-bottom: 15px;
+}

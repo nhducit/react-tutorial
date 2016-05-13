@@ -142,6 +142,21 @@ var CommentForm = React.createClass({
 
 
 var NewCommentBox = React.createClass({
+  loadCommentsFromServer: function () {
+    $.ajax({
+      url: this.props.url,
+      dataType: 'json',
+      cache: false,
+      success: function (data) {
+        //set new data received from server
+        this.setState({data: data});
+      }.bind(this),
+      error: function (xhr, status, error) {
+        console.log(this.props.url, status, error.toString());
+      }.bind(this)
+    });
+  },
+
   onCommentSubmit: function (comment) {
     var comments = this.state.data;
     //optimistic UI
@@ -162,17 +177,25 @@ var NewCommentBox = React.createClass({
         this.setState({data: data});
       }.bind(this),
       error: function () {
-        ;
+        console.log('Cannot get comment list from server');
       }
     });
-
+  },
+  getInitialState: function () {
+    //data property will be pass to children component so we need an initial state
+    return {data: []};
+  },
+  componentDidMount: function () {
+    this.loadCommentsFromServer();
+    //polling new data to update UI
+    setInterval(this.loadCommentsFromServer, this.props.pollInterval);
   },
   render: function () {
     return (
       <div>
         <h1>Comment Box</h1>
-        <NewCommentList />
-        <NewCommentForm onCommnetSubmit={this.onCommentSubmit}/>
+        <NewCommentList data={this.state.data}/>
+        <NewCommentForm onCommentSubmit={this.onCommentSubmit}/>
       </div>
     );
   }
@@ -180,10 +203,16 @@ var NewCommentBox = React.createClass({
 
 var NewCommentList = React.createClass({
   render: function () {
+    var commentNodes =  this.props.data.map(function (comment) {
+      return (
+        <NewComment author={comment.author} key={comment.id}>
+          {comment.text}
+        </NewComment>
+      );
+    });
     return (
-      <div>
-        <h1> Comment List</h1>
-        <NewComment />
+      <div className="commentList">
+        {commentNodes}
       </div>
 
     );
@@ -192,9 +221,18 @@ var NewCommentList = React.createClass({
 
 
 var NewComment = React.createClass({
+  rawMarkup: function () {
+    var rawMarkup = marked(this.props.children.toString(), {sanitize:true});
+    return {__html: rawMarkup};
+  },
   render: function () {
     return (
-      <h1>Comment</h1>
+      <div className="comment">
+        <h2 className="commentAuthor">
+          {this.props.author}
+        </h2>
+        <span dangerouslySetInnerHTML={this.rawMarkup()}/>
+      </div>
     );
   }
 });
@@ -210,12 +248,12 @@ var NewCommentForm = React.createClass({
     e.preventDefault();
     var author = this.state.author.trim();
     var text = this.state.text.trim();
-    if(!author && !text){
+    if (!author && !text) {
       return;
     }
     this.props.onCommentSubmit({author: author, text: text});
     //clear form
-    this.setState({author: '', text:''})
+    this.setState({author: '', text: ''})
   },
   handleAuthorChange: function (e) {
     this.setState({author: e.target.value});
@@ -225,48 +263,56 @@ var NewCommentForm = React.createClass({
   },
   render: function () {
     return (
-      <form className="form-horizontal" onSubmit={this.handleSubmit}>
-        <div className="form-group">
-          <label className="col-sm-2 control-label"
-            htmlFor="author">Author</label>
-          <div className="col-sm-10">
-            <input id="author"
-                   className="form-control"
-                   type="text"
-                   placeholder="Your Name"
-                   value={this.state.author}
-                   onChange={this.handleAuthorChange}
-            />
-          </div>
+      <div>
+        <form className="form-horizontal" onSubmit={this.handleSubmit}>
+          <div className="form-group">
+            <label className="col-sm-2 control-label"
+                   htmlFor="author">Author</label>
+            <div className="col-sm-10">
+              <input id="author"
+                     className="form-control"
+                     type="text"
+                     placeholder="Your Name"
+                     value={this.state.author}
+                     onChange={this.handleAuthorChange}
+              />
+            </div>
 
-        </div>
-        <div className="form-group">
-          <label className="col-sm-2 control-label"
-            htmlFor="comment">Comment</label>
-          <div className="col-sm-10">
-            <input id="comment"
-                   className="form-control"
-                   type="text"
-                   placeholder="Comment"
-                   value={this.state.text}
-                   onChange={this.handleCommentChange}
-            />
           </div>
-        </div>
-        <div className="form-group">
-          <div className="col-sm-offset-2 col-sm-10">
-            <input className="btn btn-primary"
-              type="submit"
-              value="Post"/>
+          <div className="form-group">
+            <label className="col-sm-2 control-label"
+                   htmlFor="comment">Comment</label>
+            <div className="col-sm-10">
+              <input id="comment"
+                     className="form-control"
+                     type="text"
+                     placeholder="Comment"
+                     value={this.state.text}
+                     onChange={this.handleCommentChange}
+              />
+            </div>
           </div>
+          <div className="form-group">
+            <div className="col-sm-offset-2 col-sm-10">
+              <input className="btn btn-primary"
+                     type="submit"
+                     value="Post"/>
+            </div>
+          </div>
+        </form>
+        <div>
+          <h2>Preview</h2>
+          <NewComment author={this.state.author}>
+            {this.state.text}
+          </NewComment>
         </div>
-      </form>
+      </div>
     );
   }
 });
 
 
 ReactDOM.render(
-  <NewCommentBox/>,
+  <NewCommentBox url="api/comments" pollInterval="2000"/>,
   document.getElementById('content')
 );
